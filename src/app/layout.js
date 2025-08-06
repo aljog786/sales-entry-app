@@ -1,6 +1,7 @@
-import "bootstrap/dist/css/bootstrap.min.css";
 import { Geist } from "next/font/google";
 import "./globals.css";
+import "bootstrap/dist/css/bootstrap.min.css";
+import Providers from "@/components/Providers"; // Your Redux provider wrapper
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,8 +16,8 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable}`}>
-        {children}
+      <body className={geistSans.variable}>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

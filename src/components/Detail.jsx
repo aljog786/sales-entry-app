@@ -1,53 +1,49 @@
-"use client";
-import { useState, useEffect } from "react";
-import { Card, Form, Button, Table, Container } from "react-bootstrap";
+import { useEffect, useState } from "react";
+import { Card, Form, Button, Table } from "react-bootstrap";
+import axios from "axios";
+import { updateDetailField,updateDetailItemName, addRow, removeRow } from "@/store/slices/salesSlice";
 
-export default function Detail({ setTotalAmount }) {
-  const [rows, setRows] = useState([
-    { product_name: "", qty: 0, rate: 0, amount: 0 },
-  ]);
+export default function Detail({ rows, dispatch }) {
+  const [items, setItems] = useState([]);
 
-  // Calculate amount for each row and total
   useEffect(() => {
-    const updatedRows = rows.map((row) => ({
-      ...row,
-      amount: parseFloat(row.qty) * parseFloat(row.rate),
-    }));
-    setRows(updatedRows);
+    axios
+      .get("http://5.189.180.8:8010/item")
+      .then((res) => setItems(res.data))
+      .catch((err) => console.error("Failed to fetch items", err));
+  }, []);
 
-    const total = updatedRows.reduce((sum, row) => sum + row.amount, 0);
-    setTotalAmount(total);
-  }, [rows.map((r) => `${r.qty}-${r.rate}`).join(",")]);
+const handleChange = (index, e) => {
+  const { name, value } = e.target;
 
-  const handleChange = (index, e) => {
-    const { name, value } = e.target;
-    const updated = [...rows];
-    updated[index][name] = value;
-    setRows(updated);
-  };
+  // 1) dispatch the basic field update
+  dispatch(updateDetailField({ index, field: name, value }));
 
-  const addRow = () => {
-    setRows([...rows, { product_name: "", qty: 0, rate: 0, amount: 0 }]);
-  };
+  // 2) if they picked an item_code, also dispatch item_name
+  if (name === "item_code") {
+    const selected = items.find((i) => i.item_code === value);
+    dispatch(
+      updateDetailItemName({
+        index,
+        itemName: selected?.item_name || "",
+      })
+    );
+  }
+};
 
-  const removeRow = (index) => {
-    if (rows.length === 1) return;
-    const updated = [...rows];
-    updated.splice(index, 1);
-    setRows(updated);
-  };
 
   return (
     <Card className="p-3 border border-dark">
-      <Card.Title className="bg-info p-2 text-center rounded-2 fw-bold text-white">
+      <Card.Title className="bg-info text-white text-center p-2 rounded-2 fw-bold">
         Detail
       </Card.Title>
-
       <Table bordered responsive className="text-center">
         <thead className="table-dark">
           <tr>
             <th>#</th>
-            <th>Product Name</th>
+            <th>Item Code</th>
+            <th>Item Name</th>
+            <th>Description</th>
             <th>Qty</th>
             <th>Rate</th>
             <th>Amount</th>
@@ -59,10 +55,27 @@ export default function Detail({ setTotalAmount }) {
             <tr key={index}>
               <td>{index + 1}</td>
               <td>
+                <Form.Select
+                  name="item_code"
+                  value={row.item_code}
+                  onChange={(e) => handleChange(index, e)}
+                >
+                  <option value="">Select</option>
+                  {items.map((item) => (
+                    <option key={item.item_code} value={item.item_code}>
+                      {item.item_code}
+                    </option>
+                  ))}
+                </Form.Select>
+              </td>
+              <td>
+                <Form.Control type="text" value={row.item_name} readOnly />
+              </td>
+              <td>
                 <Form.Control
                   type="text"
-                  name="product_name"
-                  value={row.product_name}
+                  name="description"
+                  value={row.description}
                   onChange={(e) => handleChange(index, e)}
                 />
               </td>
@@ -92,7 +105,7 @@ export default function Detail({ setTotalAmount }) {
               <td>
                 <Button
                   variant="danger"
-                  onClick={() => removeRow(index)}
+                  onClick={() => dispatch(removeRow(index))}
                   disabled={rows.length === 1}
                 >
                   Delete
@@ -102,13 +115,12 @@ export default function Detail({ setTotalAmount }) {
           ))}
         </tbody>
       </Table>
-
       <div className="d-flex justify-content-between mt-3">
-        <Button variant="dark" onClick={addRow}>
+        <Button variant="dark" onClick={() => dispatch(addRow())}>
           Add Row
         </Button>
         <h5>
-          Total Amount:{" "}
+          Total:{" "}
           <span className="text-success fw-bold">
             ₹{rows.reduce((sum, row) => sum + row.amount, 0).toFixed(2)}
           </span>

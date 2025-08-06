@@ -1,43 +1,70 @@
 "use client";
 import { useEffect } from "react";
-import { Button,Row, Col, Form, Card } from "react-bootstrap";
+import { Button, Row, Col, Form, Card } from "react-bootstrap";
+import { setHeader, resetAll } from "@/store/slices/salesSlice";
 
-export default function Header({ headerData, setHeaderData, totalAmount }) {
+export default function Header({ headerData, dispatch, detailRows }) {
   useEffect(() => {
-    setHeaderData((prev) => ({ ...prev, ac_amt: totalAmount }));
-  }, [totalAmount, setHeaderData]);
+    const ac_amt = detailRows.reduce((sum, row) => sum + row.qty * row.rate, 0);
+    dispatch(setHeader({ ac_amt }));
+  }, [detailRows, dispatch]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setHeaderData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    dispatch(setHeader({ [name]: value }));
   };
-  const handleSave = () => {
+
+  const handleSave = async () => {
+    if (
+      !headerData.vr_no ||
+      !headerData.ac_name ||
+      detailRows.some((r) => !r.item_code || !r.qty || !r.rate)
+    ) {
+      alert("Please fill all required fields.");
+      return;
+    }
+
     const payload = {
-      ...headerData,
-      details: rows,
+      header_table: { ...headerData },
+      detail_table: detailRows.map((row, i) => ({
+        vr_no: parseInt(headerData.vr_no, 10),
+        sr_no: i + 1,
+        item_code: row.item_code,
+        item_name: row.item_name,
+        description: row.description || "",
+        qty: parseFloat(row.qty),
+        rate: parseFloat(row.rate),
+      })),
     };
-    console.log("Saving Data:", payload);
-    alert("Data saved! Check console.");
+
+    try {
+      const res = await fetch("http://5.189.180.8:8010/header/multiple", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      // log the exact status and body
+      const text = await res.text();
+      console.log("Save response status:", res.status, text);
+
+      if (!res.ok) {
+        alert(`Save failed: ${res.status}`);
+        return;
+      }
+
+      alert("Saved successfully!");
+      // you can also resetAll() here if you like
+    } catch (err) {
+      console.error("Network or JSON error:", err);
+      alert("Save failed. See console.");
+    }
   };
 
-  const handleNew = () => {
-    setHeaderData({
-      vr_no: "",
-      vr_date: new Date().toISOString().split("T")[0],
-      status: "A",
-      ac_amt: 0,
-      ac_name: "",
-    });
-    setRows([{ product_name: "", qty: 0, rate: 0, amount: 0 }]); // from parent
-  };
 
-  const handlePrint = () => {
-    window.print();
-};
+  const handleNew = () => dispatch(resetAll());
 
+  const handlePrint = () => window.print();
 
   return (
     <Card className="p-3 mb-4 border border-dark">
